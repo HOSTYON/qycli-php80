@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Install dependencies
+apt update
+apt -y install software-properties-common curl wget tar php-pear libxml2-dev pkg-config libssl-dev libcurl4-openssl-dev libpng-dev libjpeg-dev libwebp-dev libmagickwand-dev libzip-dev libargon2-dev libonig-dev libsodium-dev
+
+# Download PHP
+php_major_version=8.0
+php_version=$(curl -s https://www.php.net/downloads.php | tac | tac | grep "<h3 id=\"v$php_major_version.*" | grep -o -P '(?<="v).*(?=" class)')
+php_version_short=$(echo "$php_major_version" | tr -d ".")
+
+mkdir -p /usr/src/qycli/php-"$php_version_short"
+cd /usr/src/qycli/php-"$php_version_short" || exit
+
+# Downloading supported PHP versions
+wget -qO php-"$php_version".tar.xz https://www.php.net/distributions/php-"$php_version".tar.xz
+tar -xf php-"$php_version".tar.xz --strip-components=1
+
+# Downloading external extensions
+declare -a extensions=("imagick" "redis")
+for ext in "${extensions[@]}"; do
+    wget -qO $ext.tgz https://pecl.php.net/get/$ext
+    mkdir -p ext/$ext
+    tar -zxf $ext.tgz --strip-components=1 -C ext/$ext/
+done
+
+# Deleting configure script for extensions to be compiled also
+rm configure
+./buildconf --force
+
+./configure \
+    --prefix=/usr/local/php"$php_version_short" \
+    --with-config-file-path=/etc/php"$php_version_short" \
+    --with-config-file-scan-dir=/etc/php"$php_version_short"/php.d \
+    --with-libdir=lib64 \
+    --enable-fpm \
+    --disable-cgi \
+    --disable-phpdbg \
+    --enable-sockets \
+    --without-sqlite3 \
+    --without-pdo-sqlite \
+    --with-mysqli \
+    --with-curl \
+    --enable-exif \
+    --enable-mbstring \
+    --with-openssl \
+    --with-zip \
+    --enable-bcmath \
+    --with-jpeg \
+    --with-webp \
+    --enable-intl \
+    --with-sodium \
+    --with-zlib \
+    --enable-soap \
+    --enable-gd=shared \
+    --with-imagick=shared \
+    --enable-redis=shared
+
+# Compile
+make -j4
+
+make install DESTDIR=/var/git/qycli-php"$php_version_short"
+
+##### #####
+# Put dynamic libraries into git repo
+
+for lib in $(ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/lib/.* "); do
+    cp "$lib" /var/git/qycli-php"$php_version_short""$lib"
+done
+
+cd /usr/local/php"$php_version_short"/lib/php/extensions/ || exit
+cd "$(ls)" || exit
+
+for ext in *; do
+    for lib in $(ldd "$ext" | grep -o "/lib/.* "); do
+        cp "$lib" /var/git/qycli-php"$php_version_short""$lib"
+    done
+done
