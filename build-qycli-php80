@@ -66,6 +66,7 @@ make install DESTDIR=/var/git/qycli-php"$php_version_short"/payload
 
 ##### #####
 # Put dynamic libraries into git repo
+mkdir -p /var/git/qycli-nginx/payload"$(ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/lib/.*/" -m 1)"
 
 for lib in $(ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/lib/.* "); do
     cp "$lib" /var/git/qycli-php"$php_version_short"/payload"$lib"
@@ -76,6 +77,8 @@ cd "$(ls)" || exit
 
 for ext in *; do
     for lib in $(ldd "$ext" | grep -o "/lib/.* "); do
+        libdir=$(echo "$lib" | grep -o "/lib/.*/")
+        [[ ! -d /var/git/qycli-php${php_version_short}/payload${libdir} ]] && mkdir -p /var/git/qycli-php"$php_version_short"/payload"$libdir"
         cp "$lib" /var/git/qycli-php"$php_version_short"/payload"$lib"
     done
 done
