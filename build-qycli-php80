@@ -9,6 +9,8 @@ php_major_version=8.0
 php_version=$(curl -s https://www.php.net/downloads.php | tac | tac | grep "<h3 id=\"v$php_major_version.*" | grep -o -P '(?<="v).*(?=" class)')
 php_version_short=$(echo "$php_major_version" | tr -d ".")
 
+[[ -d /usr/src/qycli/php-${php_version_short} ]] && rm -rf /usr/src/qycli/php-"$php_version_short"
+
 mkdir -p /usr/src/qycli/php-"$php_version_short"
 cd /usr/src/qycli/php-"$php_version_short" || exit
 
