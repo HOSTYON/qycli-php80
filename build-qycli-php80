@@ -63,8 +63,8 @@ make -j4
 
 make install
 
-mkdir /var/git/qycli-php"$php_version_short"/payload
-make install DESTDIR=/var/git/qycli-php"$php_version_short"/payload
+mkdir -p /var/git/qycli-php"$php_version_short"/payload/usr/local
+cp -r /usr/local/php"$php_version_short" /var/git/qycli-php"$php_version_short"/payload/usr/local/
 
 ##### #####
 # Put dynamic libraries into git repo
