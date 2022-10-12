@@ -2,7 +2,7 @@
 
 # Install dependencies
 apt update && apt upgrade -y
-apt -y install software-properties-common curl wget tar php-pear libxml2-dev pkg-config libssl-dev libcurl4-openssl-dev libpng-dev libjpeg-dev libwebp-dev libmagickwand-dev libzip-dev libargon2-dev libonig-dev libsodium-dev
+apt -y install build-essential software-properties-common curl wget tar php-pear libxml2-dev pkg-config libssl-dev libcurl4-openssl-dev libpng-dev libjpeg-dev libwebp-dev libmagickwand-dev libzip-dev libargon2-dev libonig-dev libsodium-dev
 
 # Download PHP
 php_major_version=8.0
