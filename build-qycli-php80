@@ -59,13 +59,16 @@ rm configure
 # Compile
 make -j4
 
-make install DESTDIR=/var/git/qycli-php"$php_version_short"
+make install
+
+mkdir /var/git/qycli-php"$php_version_short"/payload
+make install DESTDIR=/var/git/qycli-php"$php_version_short"/payload
 
 ##### #####
 # Put dynamic libraries into git repo
 
 for lib in $(ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/lib/.* "); do
-    cp "$lib" /var/git/qycli-php"$php_version_short""$lib"
+    cp "$lib" /var/git/qycli-php"$php_version_short"/payload"$lib"
 done
 
 cd /usr/local/php"$php_version_short"/lib/php/extensions/ || exit
@@ -73,6 +76,6 @@ cd "$(ls)" || exit
 
 for ext in *; do
     for lib in $(ldd "$ext" | grep -o "/lib/.* "); do
-        cp "$lib" /var/git/qycli-php"$php_version_short""$lib"
+        cp "$lib" /var/git/qycli-php"$php_version_short"/payload"$lib"
     done
 done
