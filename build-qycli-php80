@@ -77,13 +77,13 @@ rsync -a --mkpath /usr/local/php"$php_version_short"/ /php"$php_version_short"-r
 
 ##### #####
 # Getting dynamic libraries
-ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/alllibs
+ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
 for lib in $(ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/.* "); do
-    ldd "$lib" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/alllibs
+    ldd "$lib" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
     for lib2 in $(ldd "$lib" | grep -o "/.* "); do
-        ldd "$lib2" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/alllibs
+        ldd "$lib2" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
         for lib3 in $(ldd "$lib2" | grep -o "/.* "); do
-            ldd "$lib3" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/alllibs
+            ldd "$lib3" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
         done
     done
 done
@@ -92,11 +92,11 @@ cd /usr/local/php"$php_version_short"/lib/php/extensions/ || exit
 cd "$(ls)" || exit
 
 for ext in *; do
-    ldd "$ext" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/alllibs
+    ldd "$ext" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
     for lib in $(ldd "$ext" | grep -o "/.* "); do
-        ldd "$lib" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/alllibs
+        ldd "$lib" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
         for lib2 in $(ldd "$lib" | grep -o "/.* "); do
-            ldd "$lib2" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/alllibs
+            ldd "$lib2" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
         done
     done
 done
