@@ -76,20 +76,35 @@ make install
 rsync -a --mkpath /usr/local/php"$php_version_short"/ /php"$php_version_short"-result/usr/local/php"$php_version_short"
 
 ##### #####
-# Put dynamic libraries into git repo
+# Getting dynamic libraries
+ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/libs
 for lib in $(ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/.* "); do
-    libdir=$(echo /php"$php_version_short"-result"$lib" | grep -o "/.*/")
-    [[ ! -d $libdir ]] && mkdir -p "$libdir"
-    rsync -a "$lib" /php"$php_version_short"-result"$lib"
+    ldd "$lib" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/libs
+    for lib2 in $(ldd "$lib" | grep -o "/.* "); do
+        ldd "$lib2" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/libs
+        for lib3 in $(ldd "$lib2" | grep -o "/.* "); do
+            ldd "$lib3" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/libs
+        done
+    done
 done
 
 cd /usr/local/php"$php_version_short"/lib/php/extensions/ || exit
 cd "$(ls)" || exit
 
 for ext in *; do
+    ldd "$ext" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/libs
     for lib in $(ldd "$ext" | grep -o "/.* "); do
-        libdir=$(echo /php"$php_version_short"-result"$lib" | grep -o "/.*/")
-        [[ ! -d $libdir ]] && mkdir -p "$libdir"
-        rsync -a "$lib" /php"$php_version_short"-result"$lib"
+        ldd "$lib" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/libs
+        for lib2 in $(ldd "$lib" | grep -o "/.* "); do
+            ldd "$lib2" | grep -o "/.* " >>/usr/src/qycli/php-"$php_version_short"/libs
+        done
     done
 done
+
+sort -u /usr/src/qycli/php-"$php_version_short"/libs >/usr/src/qycli/php-"$php_version_short"/libssorted
+
+while IFS= read -r lib; do
+    libdir=$(echo /php"$php_version_short"-result"$lib" | grep -o "/.*/")
+    [[ ! -d $libdir ]] && mkdir -p "$libdir"
+    rsync -aL "$lib" /php"$php_version_short"-result"$lib"
+done </usr/src/qycli/php-"$php_version_short"/libssorted
