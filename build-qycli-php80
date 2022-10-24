@@ -1,39 +1,40 @@
 #!/bin/bash
-# This is built on ubuntu 21.10 so there are some preparing steps:
-sed -re 's/([a-z]{2}\.)?archive.ubuntu.com|security.ubuntu.com/old-releases.ubuntu.com/g' -i /etc/apt/sources.list
-if [[ -f /etc/needrestart/needrestart.conf ]]; then
-    export NEEDRESTART_MODE=a
-    sed "s+#\$nrconf{restart} = '.*';+\$nrconf{restart} = 'a';+" -i /etc/needrestart/needrestart.conf
-fi
-apt purge snapd -y && apt autoremove -y
-sed -re 's/([a-z]{2}\.)?archive.ubuntu.com|security.ubuntu.com/old-releases.ubuntu.com/g' -i /etc/apt/sources.list
-apt update && apt dist-upgrade -y
 
 sed -re 's/([a-z]{2}\.)?archive.ubuntu.com|security.ubuntu.com/old-releases.ubuntu.com/g' -i /etc/apt/sources.list
+
+mkdir /etc/apt/disabled.apt.conf.d/
+dpkg-divert --divert /etc/apt/disabled.apt.conf.d/99needrestart --rename /etc/apt/apt.conf.d/99needrestart
+
 # Install dependencies
 apt update && apt upgrade -y
-apt -y install build-essential software-properties-common curl wget tar php-pear libxml2-dev pkg-config libssl-dev libcurl4-openssl-dev libpng-dev libjpeg-dev libwebp-dev libmagickwand-dev libzip-dev libargon2-dev libonig-dev libsodium-dev
+apt -y install build-essential software-properties-common patchelf rsync curl wget tar php-pear libxml2-dev pkg-config libcurl4-openssl-dev libssl-dev libpng-dev libjpeg-dev libwebp-dev libmagickwand-dev libzip-dev libargon2-dev libonig-dev libsodium-dev
 
 # Download PHP
 php_major_version=8.0
 php_version=$(curl -s https://www.php.net/downloads.php | tac | tac | grep "<h3 id=\"v$php_major_version.*" | grep -o -P '(?<="v).*(?=" class)')
 php_version_short=$(echo "$php_major_version" | tr -d ".")
 
-[[ -d /usr/src/qycli/php-${php_version_short} ]] && rm -rf /usr/src/qycli/php-"$php_version_short"
+install_prefix=/usr/local/qycli/php"$php_version_short"
+compile_prefix=/usr/src/qycli/php-"$php_version_short"
+result_volume_dir=/php"$php_version_short"-result
 
-mkdir -p /usr/src/qycli/php-"$php_version_short"
-cd /usr/src/qycli/php-"$php_version_short" || exit
+export PHP_RPATHS='/lib/qycli/21.10'
+
+[[ -d /usr/src/qycli/php-${php_version_short} ]] && rm -rf "$compile_prefix"
+
+mkdir -p "$compile_prefix"
+cd "$compile_prefix" || exit
 
 # Downloading supported PHP versions
-wget -qO php-"$php_version".tar.xz https://www.php.net/distributions/php-"$php_version".tar.xz
+wget -O php-"$php_version".tar.xz https://www.php.net/distributions/php-"$php_version".tar.xz
 tar -xf php-"$php_version".tar.xz --strip-components=1
 
 # Downloading external extensions
 declare -a extensions=("imagick" "redis")
 for ext in "${extensions[@]}"; do
-    wget -qO $ext.tgz https://pecl.php.net/get/$ext
-    mkdir -p ext/$ext
-    tar -zxf $ext.tgz --strip-components=1 -C ext/$ext/
+    wget -O "$ext".tgz https://pecl.php.net/get/"$ext"
+    mkdir -p ext/"$ext"
+    tar -zxf "$ext".tgz --strip-components=1 -C ext/"$ext"/
 done
 
 # Deleting configure script for extensions to be compiled also
@@ -41,10 +42,8 @@ rm configure
 ./buildconf --force
 
 ./configure \
-    --prefix=/usr/local/php"$php_version_short" \
-    --with-config-file-path=/etc/php"$php_version_short" \
-    --with-config-file-scan-dir=/etc/php"$php_version_short"/php.d \
-    --with-libdir=lib64 \
+    --prefix="$install_prefix" \
+    --with-openssl \
     --enable-fpm \
     --disable-cgi \
     --disable-phpdbg \
@@ -55,7 +54,6 @@ rm configure
     --with-curl \
     --enable-exif \
     --enable-mbstring \
-    --with-openssl \
     --with-zip \
     --enable-bcmath \
     --with-jpeg \
@@ -73,38 +71,39 @@ make -j4
 
 make install
 
-rsync -a --mkpath /usr/local/php"$php_version_short"/ /php"$php_version_short"-result/usr/local/php"$php_version_short"
+rsync -a --mkpath "$install_prefix"/ "$result_volume_dir""$install_prefix"
 
-##### #####
 # Getting dynamic libraries
-ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
-for lib in $(ldd /usr/local/php"$php_version_short"/sbin/php-fpm | grep -o "/.* "); do
-    ldd "$lib" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
+ldd "$install_prefix"/sbin/php-fpm | grep -o "/.* " | cut -d ' ' -f 1 >>"$compile_prefix"/alllibs
+for lib in $(ldd "$install_prefix"/sbin/php-fpm | grep -o "/.* "); do
+    ldd "$lib" | grep -o "/.* " | cut -d ' ' -f 1 >>"$compile_prefix"/alllibs
     for lib2 in $(ldd "$lib" | grep -o "/.* "); do
-        ldd "$lib2" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
+        ldd "$lib2" | grep -o "/.* " | cut -d ' ' -f 1 >>"$compile_prefix"/alllibs
         for lib3 in $(ldd "$lib2" | grep -o "/.* "); do
-            ldd "$lib3" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
+            ldd "$lib3" | grep -o "/.* " | cut -d ' ' -f 1 >>"$compile_prefix"/alllibs
         done
     done
 done
 
-cd /usr/local/php"$php_version_short"/lib/php/extensions/ || exit
+cd "$install_prefix"/lib/php/extensions/ || exit
 cd "$(ls)" || exit
 
 for ext in *; do
-    ldd "$ext" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
+    ldd "$ext" | grep -o "/.* " | cut -d ' ' -f 1 >>"$compile_prefix"/alllibs
     for lib in $(ldd "$ext" | grep -o "/.* "); do
-        ldd "$lib" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
+        ldd "$lib" | grep -o "/.* " | cut -d ' ' -f 1 >>"$compile_prefix"/alllibs
         for lib2 in $(ldd "$lib" | grep -o "/.* "); do
-            ldd "$lib2" | grep -o "/.* " | cut -d ' ' -f 1 >>/usr/src/qycli/php-"$php_version_short"/alllibs
+            ldd "$lib2" | grep -o "/.* " | cut -d ' ' -f 1 >>"$compile_prefix"/alllibs
         done
     done
 done
 
-sort -u /usr/src/qycli/php-"$php_version_short"/alllibs >/usr/src/qycli/php-"$php_version_short"/libssorted
+sort -u "$compile_prefix"/alllibs >"$compile_prefix"/libssorted
 
+mkdir -p "$result_volume_dir"/lib/qycli/21.10
 while IFS= read -r lib; do
-    libdir=$(echo /php"$php_version_short"-result"$lib" | grep -o "/.*/")
-    [[ ! -d $libdir ]] && mkdir -p "$libdir"
-    rsync -aL "$lib" /php"$php_version_short"-result"$lib"
-done </usr/src/qycli/php-"$php_version_short"/libssorted
+    libtarget="$result_volume_dir""/lib/qycli/21.10/""$(basename "$lib")"
+    rsync -aL "$lib" "$libtarget"
+    # shellcheck disable=SC2016
+    patchelf --set-rpath '$ORIGIN' "$libtarget"
+done <"$compile_prefix"/libssorted
