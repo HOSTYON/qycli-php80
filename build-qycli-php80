@@ -14,11 +14,14 @@ php_major_version=8.0
 php_version=$(curl -s https://www.php.net/downloads.php | tac | tac | grep "<h3 id=\"v$php_major_version.*" | grep -o -P '(?<="v).*(?=" class)')
 php_version_short=$(echo "$php_major_version" | tr -d ".")
 
-install_prefix=/usr/local/qycli/php"$php_version_short"
 compile_prefix=/usr/src/qycli/php-"$php_version_short"
+
+install_prefix=/usr/local/qycli/php"$php_version_short"
+lib_path=/lib/lib/
+lib_path_full="$install_prefix""$lib_path"
 result_volume_dir=/php"$php_version_short"-result
 
-export PHP_RPATHS='/lib/qycli/21.10'
+#export PHP_RPATHS='/lib/qycli/21.10'
 
 [[ -d /usr/src/qycli/php-${php_version_short} ]] && rm -rf "$compile_prefix"
 
@@ -100,10 +103,22 @@ done
 
 sort -u "$compile_prefix"/alllibs >"$compile_prefix"/libssorted
 
-mkdir -p "$result_volume_dir"/lib/qycli/21.10
+mkdir -p "$result_volume_dir""$lib_path_full"
+
 while IFS= read -r lib; do
-    libtarget="$result_volume_dir""/lib/qycli/21.10/""$(basename "$lib")"
+    libtarget="$result_volume_dir""$lib_path_full""$(basename "$lib")"
     rsync -aL "$lib" "$libtarget"
     # shellcheck disable=SC2016
     patchelf --set-rpath '$ORIGIN' "$libtarget"
 done <"$compile_prefix"/libssorted
+
+# Fix interpreter
+interpreter_old="$(patchelf --print-interpreter "$install_prefix"/sbin/php-fpm)"
+# shellcheck disable=SC2016
+origin_lib_path='$ORIGIN/..'"$lib_path"
+interpreter_new="$lib_path_full""$(basename "$interpreter_old")"
+
+cp "$interpreter_old" "$result_volume_dir""$lib_path_full""$(basename "$interpreter_old")"
+
+patchelf --set-interpreter "$interpreter_new" --set-rpath "$origin_lib_path" "$result_volume_dir""$install_prefix"/sbin/php-fpm
+patchelf --set-interpreter "$interpreter_new" --set-rpath "$origin_lib_path" "$result_volume_dir""$install_prefix"/bin/php
