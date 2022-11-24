@@ -16,7 +16,7 @@ php_version_short=$(echo "$php_major_version" | tr -d ".")
 
 compile_prefix=/usr/src/qycli/php-"$php_version_short"
 
-install_prefix=/usr/local/qycli/php"$php_version_short"
+install_prefix=/var/qyc/bin/php"$php_version_short"
 lib_path=/lib/lib/
 lib_path_full="$install_prefix""$lib_path"
 result_volume_dir=/php"$php_version_short"-result
